@@ -1,0 +1,61 @@
+name: Build and Push Docker Image
+
+# This workflow runs when code is pushed to the main branch
+# or when a new Git tag (like v1.0.0) is created.
+on:
+  push:
+    branches: [ "main" ]
+    # Publish semver tags as releases.
+    tags: [ 'v*.*.*' ]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    # Sets the permissions granted to the GITHUB_TOKEN for the actions in this job.
+    permissions:
+      contents: read
+      packages: write # Required to push to GHCR
+      id-token: write # Recommended for signing images (optional but good practice)
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          # GITHUB_TOKEN is automatically provisioned by GitHub Actions
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # Generates tags based on the branch name, commit SHA, or Git tag
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Uses GitHub Actions cache to dramatically speed up Zig build times on subsequent runs
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
