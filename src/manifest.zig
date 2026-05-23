@@ -454,10 +454,10 @@ pub fn main(init: std.process.Init) !void {
 
     // ── shared fields ─────────────────────────────────────────────────────────
 
-    const group_name = try gpa.dupe(u8, try prompt(w, r, "Webhook group name (WEBHOOK_GROUP_NAME)"));
+    const group_name = try gpa.dupe(u8, try prompt(w, r, "Webhook group name (e.g. acme.mycompany.com)"));
     defer gpa.free(group_name);
 
-    const solver_name = try gpa.dupe(u8, try promptDefault(w, r, "Webhook solver name (WEBHOOK_SOLVER_NAME)", "alidns"));
+    const solver_name = try gpa.dupe(u8, try promptDefault(w, r, "Webhook solver name", "alidns"));
     defer gpa.free(solver_name);
 
     const image = try gpa.dupe(u8, try promptDefault(w, r, "Container image", "ghcr.io/dzvon/acme-dns-aliyun:main"));
@@ -476,7 +476,7 @@ pub fn main(init: std.process.Init) !void {
     if (mode_idx == 0) {
         const ak_id = try prompt(w, r, "Access Key ID");
         const ak_secret = try prompt(w, r, "Access Key Secret");
-        const region = try gpa.dupe(u8, try promptDefault(w, r, "Region (ALIBABA_CLOUD_REGION)", "cn-hangzhou"));
+        const region = try gpa.dupe(u8, try promptDefault(w, r, "Region", "cn-hangzhou"));
         defer gpa.free(region);
 
         const b64_id = try base64Encode(gpa, ak_id);
@@ -493,11 +493,11 @@ pub fn main(init: std.process.Init) !void {
             .{ "{{ALIBABA_CLOUD_REGION}}", region },
         }) };
     } else {
-        const role_arn = try gpa.dupe(u8, try prompt(w, r, "RAM Role ARN (ALIBABA_CLOUD_ROLE_ARN)"));
+        const role_arn = try gpa.dupe(u8, try prompt(w, r, "RAM Role ARN (e.g. acs:ram::1234567890:role/cert-manager-dns-solver)"));
         defer gpa.free(role_arn);
-        const oidc_arn = try gpa.dupe(u8, try prompt(w, r, "OIDC Provider ARN (ALIBABA_CLOUD_OIDC_PROVIDER_ARN)"));
+        const oidc_arn = try gpa.dupe(u8, try prompt(w, r, "OIDC Provider ARN (e.g. acs:ram::1234567890:oidc-provider/ack-rrsa-abcdef)"));
         defer gpa.free(oidc_arn);
-        const region = try gpa.dupe(u8, try promptDefault(w, r, "Region (ALIBABA_CLOUD_REGION)", "cn-hangzhou"));
+        const region = try gpa.dupe(u8, try promptDefault(w, r, "Region", "cn-hangzhou"));
         defer gpa.free(region);
 
         webhook_content = .{ .rrsa = try render(gpa, tmpl_webhook_rrsa, &.{
