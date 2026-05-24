@@ -29,6 +29,4 @@ Generated files land in `zig-out/manifests/`:
 - `apiservice.yaml` — APIService + RBAC
 - `clusterissuer.yaml` — example ClusterIssuer
 
-**For RRSA:** ensure RRSA is enabled on your ACK cluster and the RAM Role has
-`alidns:AddDomainRecord`, `DeleteDomainRecord`, and `DescribeDomainRecords` permissions
-before applying.
+**For RRSA:** see the [Terraform example](./example/rrsa-role.tf) for creating the necessary RAM Role and OIDC trust relationship.
