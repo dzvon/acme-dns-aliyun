@@ -175,6 +175,7 @@ pub fn run(
     port: u16,
     cfg: config.Config,
 ) !void {
+
     // Initialize OpenSSL
     _ = ssl_h.OPENSSL_init_ssl(0, null);
     ssl_h.ERR_clear_error();
@@ -193,16 +194,11 @@ pub fn run(
 
     std.log.info("listening on 0.0.0.0:{d} HTTPS", .{port});
 
-    // Initialize an Io concurrency group
     var group: std.Io.Group = .init;
-    // On server shutdown, block until all active connections are closed or have errored out.
-    defer group.await(io) catch {};
+    defer group.cancel(io);
 
     while (true) {
-        const conn = listener.accept(io) catch |err| {
-            std.log.err("accept error: {}", .{err});
-            continue;
-        };
+        const conn = try listener.accept(io);
 
         tls.reloadIfChanged(io, cfg);
 
@@ -219,6 +215,7 @@ fn handleConnectionTask(
     cfg: config.Config,
 ) std.Io.Cancelable!void {
     handleConnection(io, allocator, conn, ctx, cfg) catch |err| {
+        if (err == error.Canceled) return error.Canceled;
         std.log.err("connection handler error: {}", .{err});
     };
 }

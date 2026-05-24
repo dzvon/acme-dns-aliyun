@@ -5,9 +5,6 @@
 ///   1. AccessKey/SecretKey  – set via env vars or config JSON
 ///   2. RRSA (RAM Roles for Service Accounts) – OIDC-based, no static keys
 ///
-/// The webhook speaks the cert-manager AdmissionReview-like JSON protocol over
-/// plain HTTP.  cert-manager sends POST requests to /present and /cleanup.
-///
 /// Environment variables (all optional, can also come from the JSON body):
 ///   ALIBABA_CLOUD_ACCESS_KEY_ID       – AK for static-key mode
 ///   ALIBABA_CLOUD_ACCESS_KEY_SECRET   – SK for static-key mode
@@ -25,10 +22,13 @@ const config = @import("config.zig");
 const server = @import("server.zig");
 const sig = @import("signature.zig");
 
+var shutdown_event: std.Io.Event = .unset;
+var shutdown_event_io: std.Io = undefined;
+
 pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
     const environ = &init.minimal.environ;
-    // const io = init.io;
+    const io = init.io;
 
     // Parse config from environment
     const cfg = try config.Config.fromEnviron(gpa, environ);
@@ -48,8 +48,30 @@ pub fn main(init: std.process.Init) !void {
         std.log.info("credential mode: AccessKey", .{});
     }
 
+    shutdown_event_io = io;
+    // Install signal handlers before doing anything else.
+    const sa: std.posix.Sigaction = .{
+        .handler = .{ .handler = struct {
+            fn handler(_: std.posix.SIG) callconv(.c) void {
+                std.log.info("shutdown signal received, stopping listener", .{});
+                shutdown_event.set(shutdown_event_io);
+            }
+        }.handler },
+        .mask = std.posix.sigemptyset(),
+        .flags = 0,
+    };
+    std.posix.sigaction(std.posix.SIG.INT, &sa, null);
+    std.posix.sigaction(std.posix.SIG.TERM, &sa, null);
+
     // Start HTTP server
-    try server.run(init.io, gpa, port, cfg);
+    var server_future = try io.concurrent(server.run, .{ io, gpa, port, cfg });
+    defer {
+        std.log.info("shutting down the server", .{});
+        server_future.cancel(io) catch {};
+    }
+
+    std.log.info("Server started, send SIGINT or SIGTERM to shutdown", .{});
+    shutdown_event.waitUncancelable(io);
 }
 
 test {
