@@ -174,8 +174,8 @@ pub fn run(
     allocator: std.mem.Allocator,
     port: u16,
     cfg: config.Config,
+    group: *std.Io.Group,
 ) !void {
-
     // Initialize OpenSSL
     _ = ssl_h.OPENSSL_init_ssl(0, null);
     ssl_h.ERR_clear_error();
@@ -194,11 +194,14 @@ pub fn run(
 
     std.log.info("listening on 0.0.0.0:{d} HTTPS", .{port});
 
-    var group: std.Io.Group = .init;
-    defer group.cancel(io);
-
     while (true) {
-        const conn = try listener.accept(io);
+        const conn = listener.accept(io) catch |err| switch (err) {
+            error.Canceled => return error.Canceled,
+            else => {
+                std.log.warn("accept failed: {t}", .{err});
+                continue;
+            },
+        };
 
         tls.reloadIfChanged(io, cfg);
 
@@ -375,7 +378,10 @@ fn handleConnection(
                     .value = "text/plain",
                 }},
             }) catch {};
+            return;
         };
+
+        if (!request.head.keep_alive) return;
     }
 }
 

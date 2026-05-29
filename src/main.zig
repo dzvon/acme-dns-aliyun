@@ -21,9 +21,10 @@ const std = @import("std");
 const config = @import("config.zig");
 const server = @import("server.zig");
 const sig = @import("signature.zig");
+const Io = std.Io;
 
-var shutdown_event: std.Io.Event = .unset;
-var shutdown_event_io: std.Io = undefined;
+var shutdown_event: Io.Event = .unset;
+var shutdown_event_io: Io = undefined;
 
 pub fn main(init: std.process.Init) !void {
     const gpa = init.gpa;
@@ -63,15 +64,23 @@ pub fn main(init: std.process.Init) !void {
     std.posix.sigaction(std.posix.SIG.INT, &sa, null);
     std.posix.sigaction(std.posix.SIG.TERM, &sa, null);
 
-    // Start HTTP server
-    var server_future = try io.concurrent(server.run, .{ io, gpa, port, cfg });
-    defer {
-        std.log.info("shutting down the server", .{});
-        server_future.cancel(io) catch {};
-    }
+    var group: Io.Group = .init;
 
-    std.log.info("Server started, send SIGINT or SIGTERM to shutdown", .{});
+    // Start HTTP server
+    var server_future = try io.concurrent(server.run, .{ io, gpa, port, cfg, &group });
+
+    std.log.info("Server started - send SIGINT/SIGTERM to shutdown", .{});
     shutdown_event.waitUncancelable(io);
+
+    // Graceful drain
+    std.log.info("shutdown signal received, draining in-flight requests", .{});
+    // Cancel the accept loop, but not the connections
+    server_future.cancel(io) catch {};
+
+    // Await the connections
+    group.await(io) catch {};
+
+    std.log.info("drained, exiting", .{});
 }
 
 test {
