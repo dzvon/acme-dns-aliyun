@@ -16,6 +16,7 @@
 ///
 /// Reference: https://www.alibabacloud.com/help/en/sdk/product-overview/v3-request-structure-and-signature
 const std = @import("std");
+const Component = std.Uri.Component;
 
 pub const Param = struct {
     key: []const u8,
@@ -197,25 +198,10 @@ pub fn randomNonce(io: std.Io, allocator: std.mem.Allocator) ![]const u8 {
 
 /// RFC3986 percent-encoding. Unreserved: A-Z a-z 0-9 - _ . ~
 pub fn rfc3986Encode(allocator: std.mem.Allocator, input: []const u8) ![]const u8 {
-    var out: std.ArrayList(u8) = .empty;
-    defer out.deinit(allocator);
-
-    for (input) |c| {
-        if (isUnreserved(c)) {
-            try out.append(allocator, c);
-        } else {
-            try out.print(allocator, "%{X:0>2}", .{c});
-        }
-    }
-
-    return out.toOwnedSlice(allocator);
-}
-
-fn isUnreserved(c: u8) bool {
-    return switch (c) {
-        'A'...'Z', 'a'...'z', '0'...'9', '-', '_', '.', '~' => true,
-        else => false,
-    };
+    return std.fmt.allocPrint(allocator, "{f}", .{std.fmt.alt(
+        @as(Component, .{ .raw = input }),
+        .formatEscaped,
+    )});
 }
 
 fn paramLessThan(_: void, a: Param, b: Param) bool {
