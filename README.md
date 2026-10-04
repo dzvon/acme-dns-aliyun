@@ -1,7 +1,7 @@
 # acme-dns-aliyun
 
 A dead simple **cert-manager ACME DNS01 solver webhook** for **Alibaba Cloud
-(Aliyun) DNS**, written in [Zig 0.16](https://ziglang.org/).
+(Aliyun) DNS**, written in [Zig 0.17](https://ziglang.org/).
 
 No frameworks, no SDKs, no dependencies except OpenSSL for TLS, no bullshit.
 
