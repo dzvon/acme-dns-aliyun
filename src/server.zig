@@ -74,6 +74,9 @@ const ssl_h = @import("openssl");
 const SSL_CTX = ssl_h.SSL_CTX;
 const SSL = ssl_h.SSL;
 
+// SSL_OP_BIT(7) in <openssl/ssl.h>. translate-c cannot evaluate the macro.
+const SSL_OP_IGNORE_UNEXPECTED_EOF: u64 = 1 << 7;
+
 /// Transient credentials resolved per-request (from static AK or RRSA STS).
 pub const ResolvedCreds = struct {
     access_key_id: []const u8,
@@ -120,6 +123,10 @@ const TlsContext = struct {
             return error.OpenSSLInit;
         };
         _ = ssl_h.SSL_CTX_set_min_proto_version(ctx, ssl_h.TLS1_2_VERSION);
+        // OpenSSL 3 treats a TCP close without close_notify as a protocol
+        // error. Clients that drop idle keep-alive connections do this, so
+        // report it as a normal end of stream.
+        _ = ssl_h.SSL_CTX_set_options(ctx, SSL_OP_IGNORE_UNEXPECTED_EOF);
         try loadCerts(ctx, cfg);
         const mtime = try certMtime(io, cfg.cert_file_path);
         std.log.info("TLS: loaded cert={s} key={s}", .{ cfg.cert_file_path, cfg.key_file_path });
@@ -232,6 +239,24 @@ const SslStream = struct {
     ssl: *SSL,
     reader: std.Io.Reader,
     writer: std.Io.Writer,
+    read_failure: ?ReadFailure = null,
+
+    const ReadFailure = struct {
+        ssl_err: c_int,
+        lib_err: c_ulong,
+        errno: c_int,
+
+        pub fn format(self: ReadFailure, w: *std.Io.Writer) std.Io.Writer.Error!void {
+            if (self.ssl_err == ssl_h.SSL_ERROR_NONE) return w.writeAll("read buffers full");
+            try w.print("SSL_error={d}", .{self.ssl_err});
+            if (self.lib_err != 0) {
+                var buf: [256]u8 = undefined;
+                ssl_h.ERR_error_string_n(self.lib_err, &buf, buf.len);
+                try w.print(" {s}", .{std.mem.sliceTo(&buf, 0)});
+            }
+            if (self.errno != 0) try w.print(" errno={t}", .{@as(std.c.E, @fromBackingInt(@intCast(self.errno)))});
+        }
+    };
 
     // Reader VTable: pull bytes from SSL into w's available buffer space, or into
     // r.buffer when w is full. Returning 0 with no progress while `limit` is
@@ -249,31 +274,41 @@ const SslStream = struct {
                 w.end += @intCast(n);
                 return @intCast(n);
             }
-            const ssl_err = ssl_h.SSL_get_error(self.ssl, n);
-            return switch (ssl_err) {
-                ssl_h.SSL_ERROR_ZERO_RETURN => error.EndOfStream,
-                ssl_h.SSL_ERROR_SYSCALL => if (n == 0) error.EndOfStream else error.ReadFailed,
-                else => error.ReadFailed,
-            };
+            return self.readError(n);
         }
 
         // w is full: store into r.buffer and return 0 so the caller can drain w
         // first. The vtable contract allows this — returning 0 is only safe when
         // data was buffered in r.buffer (otherwise callers spin).
         const r_avail = r.buffer[r.end..];
-        if (r_avail.len == 0) return error.ReadFailed; // both buffers full, cannot make progress
+        if (r_avail.len == 0) {
+            // Both buffers are full, so the reader cannot make progress.
+            self.read_failure = .{ .ssl_err = ssl_h.SSL_ERROR_NONE, .lib_err = 0, .errno = 0 };
+            return error.ReadFailed;
+        }
         const max: usize = if (limit.toInt()) |l| @min(l, r_avail.len) else r_avail.len;
         const n = ssl_h.SSL_read(self.ssl, r_avail.ptr, @intCast(max));
         if (n > 0) {
             r.end += @intCast(n);
             return 0; // data is in r.buffer; caller will see it via the buffered path
         }
+        return self.readError(n);
+    }
+
+    /// Maps a failed SSL_read to a Reader error. For a real failure, it keeps
+    /// the cause in `read_failure` so that the caller can log it.
+    fn readError(self: *SslStream, n: c_int) std.Io.Reader.StreamError {
         const ssl_err = ssl_h.SSL_get_error(self.ssl, n);
-        return switch (ssl_err) {
-            ssl_h.SSL_ERROR_ZERO_RETURN => error.EndOfStream,
-            ssl_h.SSL_ERROR_SYSCALL => if (n == 0) error.EndOfStream else error.ReadFailed,
-            else => error.ReadFailed,
+        if (ssl_err == ssl_h.SSL_ERROR_ZERO_RETURN) return error.EndOfStream;
+        if (ssl_err == ssl_h.SSL_ERROR_SYSCALL and n == 0) return error.EndOfStream;
+        const lib_err = ssl_h.ERR_get_error();
+        self.read_failure = .{
+            .ssl_err = ssl_err,
+            .lib_err = lib_err,
+            .errno = if (ssl_err == ssl_h.SSL_ERROR_SYSCALL and lib_err == 0) std.c._errno().* else 0,
         };
+        ssl_h.ERR_clear_error();
+        return error.ReadFailed;
     }
 
     // Writer VTable: flush buffered bytes + `data` slices through SSL_write.
@@ -363,6 +398,17 @@ fn handleConnection(
     while (true) {
         var request = http_server.receiveHead() catch |err| switch (err) {
             error.HttpConnectionClosing => return, // client closed connection
+            // The transport failed, for example the client reset the
+            // connection. This is a client or network problem, not a server
+            // error.
+            error.ReadFailed => {
+                if (ssl_stream.read_failure) |f| {
+                    std.log.warn("receiveHead: connection read failed: {f}", .{f});
+                } else {
+                    std.log.warn("receiveHead: connection read failed", .{});
+                }
+                return;
+            },
             else => {
                 std.log.err("receiveHead: {}", .{err});
                 return err;
