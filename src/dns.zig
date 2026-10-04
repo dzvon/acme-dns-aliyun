@@ -217,9 +217,9 @@ fn callApi(
     defer allocator.free(canonical_query);
 
     const url = if (canonical_query.len > 0)
-        try std.fmt.allocPrint(allocator, "{s}/?{s}", .{ endpoint, canonical_query })
+        try allocator.print("{s}/?{s}", .{ endpoint, canonical_query })
     else
-        try std.fmt.allocPrint(allocator, "{s}/", .{endpoint});
+        try allocator.print("{s}/", .{endpoint});
     defer allocator.free(url);
 
     return httpGetV3(io, allocator, url, action, version, hdrs);

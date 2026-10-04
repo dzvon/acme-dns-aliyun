@@ -85,16 +85,14 @@ pub fn buildV3Headers(
     const signed_headers_str, const canonical_headers_str = blk: {
         if (security_token) |token| {
             const sh = "host;x-acs-action;x-acs-content-sha256;x-acs-date;x-acs-security-token;x-acs-signature-nonce;x-acs-version";
-            const ch = try std.fmt.allocPrint(
-                allocator,
+            const ch = try allocator.print(
                 "host:{s}\nx-acs-action:{s}\nx-acs-content-sha256:{s}\nx-acs-date:{s}\nx-acs-security-token:{s}\nx-acs-signature-nonce:{s}\nx-acs-version:{s}\n",
                 .{ host, action, content_sha256, date, token, nonce, version },
             );
             break :blk .{ sh, ch };
         } else {
             const sh = "host;x-acs-action;x-acs-content-sha256;x-acs-date;x-acs-signature-nonce;x-acs-version";
-            const ch = try std.fmt.allocPrint(
-                allocator,
+            const ch = try allocator.print(
                 "host:{s}\nx-acs-action:{s}\nx-acs-content-sha256:{s}\nx-acs-date:{s}\nx-acs-signature-nonce:{s}\nx-acs-version:{s}\n",
                 .{ host, action, content_sha256, date, nonce, version },
             );
@@ -104,8 +102,7 @@ pub fn buildV3Headers(
     defer allocator.free(canonical_headers_str);
 
     // CanonicalRequest
-    const canonical_request = try std.fmt.allocPrint(
-        allocator,
+    const canonical_request = try allocator.print(
         "{s}\n/\n{s}\n{s}\n{s}\n{s}",
         .{ method, canonical_query, canonical_headers_str, signed_headers_str, content_sha256 },
     );
@@ -113,8 +110,7 @@ pub fn buildV3Headers(
 
     // StringToSign
     const cr_hash = hexSha256(canonical_request);
-    const string_to_sign = try std.fmt.allocPrint(
-        allocator,
+    const string_to_sign = try allocator.print(
         "ACS3-HMAC-SHA256\n{s}",
         .{&cr_hash},
     );
@@ -126,8 +122,7 @@ pub fn buildV3Headers(
     const signature = std.fmt.bytesToHex(hmac_out, .lower);
 
     // Authorization header value
-    const authorization = try std.fmt.allocPrint(
-        allocator,
+    const authorization = try allocator.print(
         "ACS3-HMAC-SHA256 Credential={s},SignedHeaders={s},Signature={s}",
         .{ access_key_id, signed_headers_str, &signature },
     );
@@ -174,8 +169,7 @@ pub fn iso8601Timestamp(io: std.Io, allocator: std.mem.Allocator) ![]const u8 {
     const year_day = day.calculateYearDay();
     const month_day = year_day.calculateMonthDay();
     const day_secs = epoch.getDaySeconds();
-    return std.fmt.allocPrint(
-        allocator,
+    return allocator.print(
         "{d:0>4}-{d:0>2}-{d:0>2}T{d:0>2}:{d:0>2}:{d:0>2}Z",
         .{
             year_day.year,
@@ -198,7 +192,7 @@ pub fn randomNonce(io: std.Io, allocator: std.mem.Allocator) ![]const u8 {
 
 /// RFC3986 percent-encoding. Unreserved: A-Z a-z 0-9 - _ . ~
 pub fn rfc3986Encode(allocator: std.mem.Allocator, input: []const u8) ![]const u8 {
-    return std.fmt.allocPrint(allocator, "{f}", .{std.fmt.alt(
+    return allocator.print("{f}", .{std.fmt.alt(
         @as(Component, .{ .raw = input }),
         .formatEscaped,
     )});

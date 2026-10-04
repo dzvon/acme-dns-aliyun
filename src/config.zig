@@ -74,8 +74,7 @@ pub const Config = struct {
                 break :blk try allocator.dupe(u8, ep);
             }
             // Build regional STS endpoint: https://sts.<region>.aliyuncs.com
-            const ep = try std.fmt.allocPrint(
-                allocator,
+            const ep = try allocator.print(
                 "https://sts.{s}.aliyuncs.com",
                 .{region},
             );

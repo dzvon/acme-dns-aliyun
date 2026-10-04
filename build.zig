@@ -40,7 +40,7 @@ pub fn build(b: *std.Build) void {
 
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
-    if (b.args) |args| run_cmd.addArgs(args);
+    run_cmd.addPassthruArgs();
 
     const run_step = b.step("run", "Run the webhook server");
     run_step.dependOn(&run_cmd.step);
@@ -55,7 +55,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     const run_manifest = b.addRunArtifact(manifest_exe);
-    run_manifest.addArg(b.path("zig-out/manifests").getPath(b));
+    run_manifest.addDirectoryArg2(b.path("zig-out/manifests"), .{ .make_absolute = true });
     // inherit lets prompts reach the terminal interactively.
     run_manifest.stdio = .inherit;
     const manifest_step = b.step("manifest", "Interactively generate Kubernetes manifests into zig-out/manifests/");

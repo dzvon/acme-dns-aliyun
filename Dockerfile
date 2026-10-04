@@ -1,7 +1,7 @@
 FROM debian:trixie-slim AS builder
 
-# Download and install Zig 0.16
-ARG ZIG_VERSION=0.16.0
+# Download and install Zig 0.17
+ARG ZIG_VERSION=0.17.0
 ARG TARGETARCH=amd64
 
 # Install build dependencies and OpenSSL development headers

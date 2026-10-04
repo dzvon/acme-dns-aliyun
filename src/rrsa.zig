@@ -50,8 +50,7 @@ pub fn assumeRoleWithOidc(
     const encoded_provider_arn = try sig.rfc3986Encode(allocator, rrsa.oidc_provider_arn);
     defer allocator.free(encoded_provider_arn);
 
-    const body = try std.fmt.allocPrint(
-        allocator,
+    const body = try allocator.print(
         "Action={s}&Format={s}&Version={s}&Timestamp={s}&SignatureNonce={s}&RoleArn={s}&OIDCProviderArn={s}&OIDCToken={s}&RoleSessionName={s}&DurationSeconds={d}",
         .{
             "AssumeRoleWithOIDC",
@@ -69,7 +68,7 @@ pub fn assumeRoleWithOidc(
     defer allocator.free(body);
 
     // 3. POST to the STS endpoint.
-    const url = try std.fmt.allocPrint(allocator, "{s}/", .{sts_endpoint});
+    const url = try allocator.print("{s}/", .{sts_endpoint});
     defer allocator.free(url);
 
     const response = try httpPostForm(io, allocator, url, body);

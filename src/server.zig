@@ -412,8 +412,7 @@ fn handleRequest(
     }
 
     // cert-manager calls POST /apis/<groupName>/v1alpha1/<solverName>
-    const solver_path = try std.fmt.allocPrint(
-        allocator,
+    const solver_path = try allocator.print(
         "/apis/{s}/v1alpha1/{s}",
         .{ cfg.group_name, cfg.solver_name },
     );
@@ -436,7 +435,7 @@ fn handleRequest(
         // Parse JSON
         const parsed = std.json.parseFromSliceLeaky(ChallengePayloadIn, allocator, body, .{ .ignore_unknown_fields = true }) catch |err| {
             std.log.err("JSON parse error: {}", .{err});
-            const resp = try std.fmt.allocPrint(allocator, "{{\"error\":\"bad json: {}\"}}", .{err});
+            const resp = try allocator.print("{{\"error\":\"bad json: {}\"}}", .{err});
             try req.respond(resp, .{
                 .status = .bad_request,
                 .extra_headers = &.{.{ .name = "Content-Type", .value = "application/json" }},
@@ -473,7 +472,7 @@ fn handleRequest(
         };
 
         // Success response
-        const resp_body = try std.fmt.allocPrint(allocator,
+        const resp_body = try allocator.print(
             \\{{
             \\  "apiVersion": "acme.cert-manager.io/v1alpha1",
             \\  "kind": "ChallengePayload",
@@ -492,10 +491,10 @@ fn handleRequest(
     }
 
     // Discovery: GET /apis/<group>/v1alpha1 — kube-apiserver polls this to check APIService availability.
-    const version_path = try std.fmt.allocPrint(allocator, "/apis/{s}/v1alpha1", .{cfg.group_name});
+    const version_path = try allocator.print("/apis/{s}/v1alpha1", .{cfg.group_name});
 
     if (std.mem.eql(u8, target, version_path)) {
-        const body = try std.fmt.allocPrint(allocator,
+        const body = try allocator.print(
             \\{{
             \\  "kind": "APIResourceList",
             \\  "apiVersion": "v1",
@@ -519,14 +518,14 @@ fn handleRequest(
     }
 
     // Discovery: GET /apis/<group> — kube-apiserver polls this for group metadata.
-    const group_path = try std.fmt.allocPrint(allocator, "/apis/{s}", .{cfg.group_name});
+    const group_path = try allocator.print("/apis/{s}", .{cfg.group_name});
 
     if (std.mem.eql(u8, target, group_path)) {
         if (req.head.method.requestHasBody()) {
             var buf: [4096]u8 = undefined;
             _ = req.readerExpectNone(&buf).discardRemaining() catch {};
         }
-        const body = try std.fmt.allocPrint(allocator,
+        const body = try allocator.print(
             \\{{
             \\  "kind": "APIGroup",
             \\  "apiVersion": "v1",
@@ -553,7 +552,7 @@ fn handleRequest(
             var buf: [4096]u8 = undefined;
             _ = req.readerExpectNone(&buf).discardRemaining() catch {};
         }
-        const body = try std.fmt.allocPrint(allocator,
+        const body = try allocator.print(
             \\{{
             \\  "metadata": {{}},
             \\  "kind": "APIGroupDiscoveryList",
@@ -603,7 +602,7 @@ fn sendError(
     uid: []const u8,
     errorMsg: []const u8,
 ) !void {
-    const resp_body = try std.fmt.allocPrint(allocator,
+    const resp_body = try allocator.print(
         \\{{
         \\  "apiVersion": "acme.cert-manager.io/v1alpha1",
         \\  "kind": "ChallengePayload",

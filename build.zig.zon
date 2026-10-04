@@ -25,7 +25,7 @@
     .fingerprint = 0xf0b22dc9ec23980, // Changing this has security and trust implications.
     // Tracks the earliest Zig version that the package considers to be a
     // supported use case.
-    .minimum_zig_version = "0.16.0",
+    .minimum_zig_version = "0.17.0",
     // This field is optional.
     // Each dependency must either provide a `url` and `hash`, or a `path`.
     // `zig build --fetch` can be used to fetch all dependencies of a package, recursively.
@@ -33,8 +33,8 @@
     // internet connectivity.
     .dependencies = .{
         .translate_c = .{
-            .url = "git+https://codeberg.org/ziglang/translate-c?ref=zig-0.16.x#6fe0ffc4549f15c5f2d9432c2b4460ba90ff85ac",
-            .hash = "translate_c-1.0.0-Q_BUWo_5BgD4flHdUhA31zOz0XvZk9k7lQv1ouzyNXj2",
+            .url = "git+https://codeberg.org/ziglang/translate-c?ref=zig-0.17.x#02ff0c523fb92a38939b04d0145c4a9602a74d56",
+            .hash = "translate_c-2.0.0-Q_BUWltOBwBYABF84EUL208pIFeUIwbBs29FmVBaafN5",
         },
     },
     .paths = .{
