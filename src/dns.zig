@@ -179,6 +179,7 @@ fn deleteTxtRecord(
 
         std.log.debug("DeleteDomainRecord RecordId={s} response: {s}", .{ record_id, body });
         try checkApiError(allocator, body);
+        std.log.info("DeleteDomainRecord done: RecordId={s}", .{record_id});
     }
 }
 
