@@ -32,6 +32,12 @@ WORKDIR /app
 
 # Copy your source code and build script into the container
 COPY build.zig build.zig.zon ./
+
+# Fetch dependencies and compile the build runner in a separate layer. A cold
+# build runner compile takes more than a minute with Zig 0.17. This layer stays
+# cached until build.zig or build.zig.zon changes.
+RUN zig build --fetch && zig build -l > /dev/null
+
 COPY src/ src/
 
 # Build the binary. We link OpenSSL dynamically against the Debian system libraries.
