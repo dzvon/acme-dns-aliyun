@@ -83,8 +83,7 @@ fn describeRecords(
         try params.append(allocator, .{ .key = "Type", .value = "TXT" });
         try params.append(allocator, .{ .key = "PageSize", .value = "20" });
 
-        const body = try callApi(io, allocator, "GET", host, "DescribeDomainRecords",
-            dns_api_version, cfg.dns_endpoint, params.items, creds);
+        const body = try callApi(io, allocator, "GET", host, "DescribeDomainRecords", dns_api_version, cfg.dns_endpoint, params.items, creds);
         defer allocator.free(body);
 
         std.log.debug("DescribeDomainRecords response: {s}", .{body});
@@ -136,8 +135,7 @@ fn addTxtRecord(
 
     const host = hostFromEndpoint(cfg.dns_endpoint);
     std.log.info("AddDomainRecord httpGet starting", .{});
-    const body = try callApi(io, allocator, "GET", host, "AddDomainRecord",
-        dns_api_version, cfg.dns_endpoint, params.items, creds);
+    const body = try callApi(io, allocator, "GET", host, "AddDomainRecord", dns_api_version, cfg.dns_endpoint, params.items, creds);
     defer allocator.free(body);
     std.log.info("AddDomainRecord httpGet done: {s}", .{body});
     try checkApiError(allocator, body);
@@ -176,8 +174,7 @@ fn deleteTxtRecord(
 
         try params.append(allocator, .{ .key = "RecordId", .value = record_id });
 
-        const body = try callApi(io, allocator, "GET", host, "DeleteDomainRecord",
-            dns_api_version, cfg.dns_endpoint, params.items, creds);
+        const body = try callApi(io, allocator, "GET", host, "DeleteDomainRecord", dns_api_version, cfg.dns_endpoint, params.items, creds);
         defer allocator.free(body);
 
         std.log.debug("DeleteDomainRecord RecordId={s} response: {s}", .{ record_id, body });
@@ -290,7 +287,7 @@ pub fn httpGetV3(
     const result = try client.fetch(.{
         .method = .GET,
         .location = .{ .url = url },
-.extra_headers = extra_headers,
+        .extra_headers = extra_headers,
         .response_writer = &response_writer.writer,
     });
 
